@@ -1,0 +1,8 @@
+[Interface]
+PrivateKey = <client_private.key>
+Address = 10.8.0.2/32
+
+[Peer]
+PublicKey = <server_public.key>
+Endpoint = <IP công khai của server>:51820
+AllowedIPs = 0.0.0.0/0

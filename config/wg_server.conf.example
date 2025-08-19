@@ -1,0 +1,9 @@
+# if not using address use this command : New-NetIPAddress -InterfaceAlias "WireGuard Tunnel: wg0" -IPAddress 10.8.0.1 -PrefixLength 24
+[Interface]
+PrivateKey = <server_private.key>
+# Address = 10.8.0.1/24
+ListenPort = 51820
+
+[Peer]
+PublicKey = <client_public.key>
+AllowedIPs = 10.8.0.2/32
