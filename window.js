@@ -1,5 +1,6 @@
 const express = require('express');
 const runCommand = require('./utils/runCommand');
+const getWindowExePath = require('./utils/getWindowExePath');
 const parseWgShowOutput = require('./utils/parseWgShowOutput');
 const fs = require('fs/promises');
 const path = require('path');
@@ -12,23 +13,6 @@ let wireguardExePath;
 
 const app = express();
 app.use(express.json());
-
-const getWindowExePath = async () => {
-    try {
-        const stdout = await runCommand('where wg');
-        const wgPath = stdout.trim();
-
-        const wireguardDir = path.dirname(wgPath);
-        const wireguardExePath = path.join(wireguardDir, 'wireguard.exe');
-
-        await fs.access(wireguardExePath);
-
-        this.execPath = wireguardExePath;
-        return wireguardExePath;
-    } catch {
-        throw new Error('Not found wireguard.exe on the system or PATH');
-    }
-}
 
 function sleep(time) {
     return new Promise((rs) => setTimeout(rs, time));

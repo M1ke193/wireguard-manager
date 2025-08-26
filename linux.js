@@ -8,7 +8,7 @@ const path = require('path');
 const API_PORT = 8778;
 const SHARED_SECRET_KEY = 'kxAeVVYSgMUEXw7UszHJ+EeC0bdQ//zPP/dXUoKzgcc=';
 const WG_INTERFACE = 'wg_server'; 
-const WG_CONFIG_PATH = path.join('/etc/wireguard/', `${WG_INTERFACE}.conf`);
+const WG_CONFIG_PATH = path.resolve('./config/wg0.conf');
 
 const app = express();
 app.use(express.json());

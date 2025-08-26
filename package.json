@@ -8,7 +8,9 @@
   },
   "scripts": {
     "start:window": "nodemon window.js",
-    "start:linux": "nodemon linux.js"
+    "start:linux": "nodemon linux.js",
+    "start:wg" : "node ./script/startWireguard.js",
+    "stop:wg" : "node ./script/stopWireguard.js"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
