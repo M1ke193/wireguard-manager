@@ -1,5 +1,6 @@
 const express = require('express');
 const runCommand = require('./utils/runCommand');
+const parseWgShowOutput = require('./utils/parseWgShowOutput');
 const fs = require('fs/promises');
 const path = require('path');
 
@@ -33,61 +34,6 @@ function sleep(time) {
     return new Promise((rs) => setTimeout(rs, time));
 }
 
-function parseWgShowOutput(output) {
-    if (!output) {
-        throw new Error("output of status is empty")
-    }
-
-    const lines = output.split('\n');
-
-    const result = {
-        peers: [],
-        port: null,
-        publicKey: null,
-        status: 'up'
-    };
-
-    let currentPeer = null;
-
-    lines.forEach(line => {
-        line = line.trim();
-        const publicKeyMatch = line.match(/public key: (.+)/);
-        if (publicKeyMatch) result.publicKey = publicKeyMatch[1];
-        
-        const portMatch = line.match(/listening port: (.+)/);
-        if (portMatch) result.port = parseInt(portMatch[1], 10);
-        
-        const peerMatch = line.match(/peer: (.+)/);
-        if (peerMatch) {
-            if (currentPeer) result.peers.push(currentPeer);
-            currentPeer = { publicKey: peerMatch[1] };
-        }
-
-        if (currentPeer) {
-            const endpointMatch = line.match(/endpoint: (.+)/);
-            if (endpointMatch) currentPeer.endpoint = endpointMatch[1];
-            
-            const allowedIpsMatch = line.match(/allowed ips: (.+)/);
-            if (allowedIpsMatch) currentPeer.allowedIps = allowedIpsMatch[1];
-            
-            const handshakeMatch = line.match(/latest handshake: (.+)/);
-            if (handshakeMatch) currentPeer.latestHandshake = handshakeMatch[1];
-
-            const transferMatch = line.match(/transfer: (.+)/);
-            if (transferMatch) {
-                const parts = transferMatch[1].split(', ');
-                currentPeer.transfer = {
-                    received: parts[0],
-                    sent: parts[1]
-                };
-            }
-        }
-    });
-
-    if (currentPeer) result.peers.push(currentPeer);
-    return result;
-}
-
 const securityMiddleware = (req, res, next) => {
     const authKey = req.headers['authorization'];
     if (!authKey || authKey !== SHARED_SECRET_KEY) {
@@ -104,6 +50,7 @@ app.get(`/interface/${WG_INTERFACE}`, async (req, res) => {
         const parsedStatus = parseWgShowOutput(statusOutput);
         res.json(parsedStatus);
     } catch (error) {
+       console.error(`[${req.method}] ${req.originalUrl} - ${error.message}`);
        res.status(500).json({ error : `Failed to get wireguard status: ${error.message}`})
     }
 });
@@ -115,6 +62,7 @@ app.get('/key', async (req, res) => {
         const psk = await runCommand('wg genpsk');
         res.json({ private: privateKey, public: publicKey, psk: psk });
     } catch (error) {
+        console.error(`[${req.method}] ${req.originalUrl} - ${error.message}`);
         res.status(500).json({ error: 'Failed to generate keys. Make sure WireGuard is in your system PATH.', details: error.message });
     }
 });
@@ -124,6 +72,7 @@ app.patch(`/interface/${WG_INTERFACE}`, async (req, res) => {
         await runCommand(`wireguard.exe /installtunnelservice "${WG_CONFIG_PATH}"`);
         res.json({ message: `Service for ${WG_INTERFACE} installed and started successfully.` });
     } catch (error) {
+        console.error(`[${req.method}] ${req.originalUrl} - ${error.message}`);
         res.status(500).json({ error: 'Failed to start interface service', details: error.message });
     }
 });
@@ -133,6 +82,7 @@ app.delete(`/interface/${WG_INTERFACE}`, async (req, res) => {
         await runCommand(`wireguard.exe /uninstalltunnelservice ${WG_INTERFACE}`);
         res.json({ message: `Service for ${WG_INTERFACE} uninstalled and stopped successfully.` });
     } catch (error) {
+        console.error(`[${req.method}] ${req.originalUrl} - ${error.message}`);
         res.status(500).json({ error: 'Failed to stop interface service', details: error.message });
     }
 });
@@ -140,8 +90,8 @@ app.delete(`/interface/${WG_INTERFACE}`, async (req, res) => {
 app.post(`/interface/${WG_INTERFACE}/config`, async (req, res) => {
     const peers = req.body;
 
-    if (!Array.isArray(peers) || peers.length === 0) {
-        return res.status(400).json({ error: 'Request body must be a non-empty array of peers.' });
+    if (!Array.isArray(peers)) {
+        return res.status(400).json({ error: 'Request body must be a array of peers.' });
     }
 
     let allNewPeersConfig = '';
@@ -181,7 +131,7 @@ ${persistentKeepalive ? `PersistentKeepalive = ${persistentKeepalive}` : ''}
         
         res.status(201).json({ message: `${peers.length} peers added and service restarted successfully.` });
     } catch (error) {
-        console.error(error.message)
+        console.error(`[${req.method}] ${req.originalUrl} - ${error.message}`);
         res.status(500).json({ error: 'Failed to add peers to config file', details: error.message });
     }
 });

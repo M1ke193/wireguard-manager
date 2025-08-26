@@ -1,6 +1,7 @@
 // server-linux.js
 const express = require('express');
 const runCommand = require('./utils/runCommand');
+const parseWgShowOutput = require('./utils/parseWgShowOutput');
 const fs = require('fs/promises');
 const path = require('path');
 
@@ -14,46 +15,6 @@ app.use(express.json());
 
 function sleep(time) {
     return new Promise((rs) => setTimeout(rs, time));
-}
-
-function parseWgShowOutput(output) {
-    if (!output) {
-       throw new Error("output of status is empty")
-    }
-
-    const lines = output.split('\n');
-    const result = {
-        peers: [],
-        port: null,
-        publicKey: null,
-        status: 'up'
-    };
-    let currentPeer = null;
-
-    lines.forEach(line => {
-        line = line.trim();
-        if (line.startsWith('interface:')) result.publicKey = lines[1]?.trim().split(': ')[1];
-        if (line.startsWith('listening port:')) result.port = parseInt(line.split(': ')[1], 10);
-        
-        const peerMatch = line.match(/^peer: (.+)/);
-        if (peerMatch) {
-            if (currentPeer) result.peers.push(currentPeer);
-            currentPeer = { publicKey: peerMatch[1] };
-        }
-
-        if (currentPeer) {
-            if (line.startsWith('endpoint:')) currentPeer.endpoint = line.split(': ')[1];
-            if (line.startsWith('allowed ips:')) currentPeer.allowedIps = line.split(': ')[1];
-            if (line.startsWith('latest handshake:')) currentPeer.latestHandshake = line.split(': ')[1];
-            if (line.startsWith('transfer:')) {
-                const parts = line.split(': ')[1].split(', ');
-                currentPeer.transfer = { received: parts[0], sent: parts[1] };
-            }
-        }
-    });
-
-    if (currentPeer) result.peers.push(currentPeer);
-    return result;
 }
 
 const securityMiddleware = (req, res, next) => {
@@ -109,7 +70,7 @@ app.delete(`/interface/${WG_INTERFACE}`, async (req, res) => {
 app.post(`/interface/${WG_INTERFACE}/config`, async (req, res) => {
     const peers = req.body;
 
-    if (!Array.isArray(peers) || peers.length === 0) {
+    if (!Array.isArray(peers)) {
         return res.status(400).json({ error: 'Request body must be a non-empty array of peers.' });
     }
 

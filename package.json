@@ -7,7 +7,10 @@
     "express": "^5.1.0"
   },
   "scripts": {
-     "start:window" : "node window.js",
-     "start:linux" : "node linux.js"
+    "start:window": "nodemon window.js",
+    "start:linux": "nodemon linux.js"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }
