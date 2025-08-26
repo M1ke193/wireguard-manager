@@ -1,5 +1,5 @@
 const express = require('express');
-const { exec } = require('child_process');
+const runCommand = require('./utils/runCommand');
 const fs = require('fs/promises');
 const path = require('path');
 
@@ -7,21 +7,30 @@ const API_PORT = 8778;
 const SHARED_SECRET_KEY = 'kxAeVVYSgMUEXw7UszHJ+EeC0bdQ//zPP/dXUoKzgcc=';
 const WG_INTERFACE = 'wg0'; 
 const WG_CONFIG_PATH = path.resolve('./config/wg0.conf');
+let wireguardExePath;
 
 const app = express();
 app.use(express.json());
 
-function runCommand(command) {
-    console.log(`Executing: ${command}`);
-    return new Promise((resolve, reject) => {
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error: ${stderr || error.message}`);
-                return reject(new Error(stderr || error.message));
-            }
-            resolve(stdout.trim());
-        });
-    });
+const getWindowExePath = async () => {
+    try {
+        const stdout = await runCommand('where wg');
+        const wgPath = stdout.trim();
+
+        const wireguardDir = path.dirname(wgPath);
+        const wireguardExePath = path.join(wireguardDir, 'wireguard.exe');
+
+        await fs.access(wireguardExePath);
+
+        this.execPath = wireguardExePath;
+        return wireguardExePath;
+    } catch {
+        throw new Error('Not found wireguard.exe on the system or PATH');
+    }
+}
+
+function sleep(time) {
+    return new Promise((rs) => setTimeout(rs, time));
 }
 
 function parseWgShowOutput(output) {
@@ -162,10 +171,17 @@ ${persistentKeepalive ? `PersistentKeepalive = ${persistentKeepalive}` : ''}
         await fs.appendFile(WG_CONFIG_PATH, allNewPeersConfig);
         
         console.log('Restarting service to apply new peer configurations...');
-        await runCommand(`wg syncconf ${WG_INTERFACE} "${WG_CONFIG_PATH}"`);
+
+        if (!wireguardExePath) wireguardExePath = await getWindowExePath();
+
+        await runCommand(`"${wireguardExePath}" /uninstalltunnelservice  ${WG_INTERFACE}`);
+        await sleep(1000);
+        await runCommand(`"${wireguardExePath}" /installtunnelservice "${WG_CONFIG_PATH}"`);
+        await sleep(1000);
         
         res.status(201).json({ message: `${peers.length} peers added and service restarted successfully.` });
     } catch (error) {
+        console.error(error.message)
         res.status(500).json({ error: 'Failed to add peers to config file', details: error.message });
     }
 });

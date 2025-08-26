@@ -1,6 +1,6 @@
 // server-linux.js
 const express = require('express');
-const { exec } = require('child_process');
+const runCommand = require('./utils/runCommand');
 const fs = require('fs/promises');
 const path = require('path');
 
@@ -12,18 +12,8 @@ const WG_CONFIG_PATH = path.join('/etc/wireguard/', `${WG_INTERFACE}.conf`);
 const app = express();
 app.use(express.json());
 
-function runCommand(command) {
-    const commandToRun = command.startsWith('wg') ? `sudo ${command}` : command;
-    console.log(`Executing: ${commandToRun}`);
-    return new Promise((resolve, reject) => {
-        exec(commandToRun, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error: ${stderr || error.message}`);
-                return reject(new Error(stderr || error.message));
-            }
-            resolve(stdout.trim());
-        });
-    });
+function sleep(time) {
+    return new Promise((rs) => setTimeout(rs, time));
 }
 
 function parseWgShowOutput(output) {
@@ -151,7 +141,9 @@ ${persistentKeepalive ? `PersistentKeepalive = ${persistentKeepalive}` : ''}
         
         console.log('Restarting interface to apply new peer configurations...');
         await runCommand(`wg-quick down ${WG_INTERFACE}`);
+        await sleep(1000);
         await runCommand(`wg-quick up ${WG_INTERFACE}`);
+        await sleep(1000);
         
         res.status(201).json({ message: `${peers.length} peers added and service restarted successfully.` });
     } catch (error) {
